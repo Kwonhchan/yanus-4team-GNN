@@ -5,6 +5,7 @@ from torch_geometric.data.data import BaseData
 from csv2graph import csv2graph_D
 from torch_geometric.data import Dataset, DataLoader
 
+#todo 커스텀데이터셋 재구축하기, 모델 구축 및 Predict 구현하기
 class gDataset(torch.utils.data.Dataset):
     def __init__(self, path):
         self.path = path
