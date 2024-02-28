@@ -25,9 +25,9 @@ class gDataset(torch.utils.data.Dataset):
         return pyg_data
 
 
-# class gDataLoader(DataLoader):
-#     def __init__(self, *args, **kwargs):
-#         super(gDataLoader, self).__init__(*args, **kwargs)
+class gDataLoader(DataLoader):
+    def __init__(self, *args, **kwargs):
+        super(gDataLoader, self).__init__(*args, **kwargs)
 
 class DataSplitter:
     def __init__(self, dataset_path, batchsize=32, test_size=0.1, val_size=0.2):

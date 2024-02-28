@@ -25,3 +25,6 @@ def main():
     
 if __name__ == "__main__":
     main()
+
+#m1 모델 loss 253~255 반복
+#m2 모델 accuracy 32~33 

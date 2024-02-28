@@ -33,7 +33,7 @@ loader = dl.gDataLoader(dataset, batch_size=32, shuffle=True)
 
 # 모델 학습
 model.train()
-for epoch in range(100):
+for epoch in range(10):
     total_loss = 0
     for data in tqdm(loader, desc=f'Epoch {epoch+1}'):
         optimizer.zero_grad()
