@@ -9,7 +9,7 @@ from torch_geometric.data import Data
 
 class csv2graph_D:
     def __init__(self, path):
-        self.path = path
+        self.path = 'Dataset\최종합데이터.csv'
         self.graphs = {}  # 사용자별 그래프를 저장할 딕셔너리
         self.pyg_graphs = []  # PyTorch Geometric 그래프 데이터 저장
         self.visit_area_to_index = {}  # 방문 지역 인덱스 매핑
