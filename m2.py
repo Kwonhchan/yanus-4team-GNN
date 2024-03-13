@@ -8,7 +8,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 from torch_geometric.nn import SAGEConv, GATConv, GCNConv, TopKPooling, global_mean_pool
 
-# GCN, GAT, GraphSAGE, Unet구조, skip-connection, residual Connections, 멀티-헤드 Attention 메커니즘, TopKPooling
+# GCN, GAT, GraphSAGE, Unet구조, skip-connection, residual Connections, 멀티-헤드 Attention 메커니즘
 class m2_model(torch.nn.Module):
     def __init__(self, num_node_features, num_classes):
         super(m2_model, self).__init__()
