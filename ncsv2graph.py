@@ -9,7 +9,7 @@ from torch_geometric.data import Data
 
 class GraphData:
     def __init__(self, path):
-        self.path = path
+        self.path = "Dataset\최종합데이터.csv"
         self.graph = nx.Graph()
         self.graphs = []  # 그래프 리스트를 저장할 멤버 변수
         self.load_data()
@@ -44,6 +44,7 @@ class GraphData:
                             rcmdtn_intention=row['RCMDTN_INTENTION'])
             self.graphs.append(G)
         return self.graphs
+    
     def graph_to_pyg_data(self, G):
         # 노드 ID와 노드 특성을 인코딩하기 위한 LabelEncoder 생성
         le = LabelEncoder()

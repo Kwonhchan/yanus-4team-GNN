@@ -4,6 +4,7 @@ from dl_proc import DataSplitter  # 데이터 분할 및 로딩 클래스
 import dl_proc as dp
 import m2
 import torch
+import ncustom
 
 def main():
     
@@ -15,13 +16,14 @@ def main():
     lr = 0.001  # 학습률
 
     # `gDataset` 인스턴스 생성
-    dataset = dp.gDataset(dataset_path)
+    
+    dataset = ncustom.CustomDataset(root=dataset_path)
 
     # `Trainer` 인스턴스 생성
     trainer = m2.Trainer(model=model, dataset=dataset, lr=lr)
 
     # 훈련 시작
-    trainer.train(epochs=500)
+    trainer.train(epochs=1000)
     
 if __name__ == "__main__":
     main()

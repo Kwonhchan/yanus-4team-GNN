@@ -109,7 +109,7 @@ class Trainer:
                 # 진행 상황 업데이트
                 progress_bar.set_postfix(val_loss=val_loss/(progress_bar.last_print_n+1), accuracy=100. * correct / total)
 
-        self.save_checkpoint(val_loss, 'model_checkpoint.pth')
+        self.save_checkpoint(val_loss, 'newdatamodel/model_checkpoint.pth')
 
     def save_checkpoint(self, val_loss, filename):
         torch.save({

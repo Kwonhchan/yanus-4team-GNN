@@ -2,27 +2,31 @@ import torch
 import torch.nn.functional as F
 from torch.optim import Adam
 from torch_geometric.data import DataLoader
+import pandas as pd
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from nmodel import NGCF  # 모델 클래스 이름 수정 필요
-from ncustom import CustomDataset  # CustomDataset 임포트
-from sklearn.metrics import accuracy_score
+from nmodel import NGCF  # 모델 클래스 이름 확인 필요
+from ncustom import CustomDataset, NDataSplitter  # CustomDataset 및 NDataSplitter 임포트
 
+# CUDA 사용 가능 여부 확인 및 device 설정
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
-
-# 데이터셋 경로 설정
-data_path = 'Dataset\최종합데이터.csv'
+# 데이터셋 경로 설정 (경로 수정 필요)
+data_path = 'Dataset/최종합데이터.csv'
 
 # CustomDataset 인스턴스 생성
-train_dataset = CustomDataset(root=data_path, dataset_type='train')
-val_dataset = CustomDataset(root=data_path, dataset_type='val')
+dataset = CustomDataset(root=data_path)
 
-# DataLoader 생성
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+# DataLoader 생성 및 데이터 분할
+data_splitter = NDataSplitter(dataset)
+train_loader, val_loader, test_loader = data_splitter.split_data()
 
-# 모델, 옵티마이저 초기화
-model = NGCF()
+# 모델, 옵티마이저 초기화 및 CUDA device로 이동
+data = pd.read_csv('Dataset\최종합데이터.csv')
+num_users = data['TRAVEL_ID'].nunique()
+num_items = data['VISIT_AREA_NM'].nunique()
+model = NGCF(num_users=num_users, num_items=num_items, emb_size=64, layers=[64, 64, 64]).to(device)
 optimizer = Adam(model.parameters(), lr=0.001)
 
 # TensorBoard 설정
@@ -38,6 +42,7 @@ for epoch in range(100):
     total_train_correct = 0
     total_train = 0
     for data in tqdm(train_loader, desc=f"Epoch {epoch+1}/100 Training"):
+        data = data.to(device)
         optimizer.zero_grad()
         out = model(data)
         loss = F.nll_loss(out, data.y)
@@ -61,6 +66,7 @@ for epoch in range(100):
     total_val = 0
     with torch.no_grad():
         for data in tqdm(val_loader, desc=f"Epoch {epoch+1}/100 Validation"):
+            data = data.to(device)
             pred = model(data)
             loss = F.nll_loss(pred, data.y)
             total_val_loss += loss.item() * data.num_graphs
@@ -76,10 +82,9 @@ for epoch in range(100):
     print(f"Epoch {epoch+1}: Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}")
 
     # 모델 파일 이름에 성능 메트릭 포함
-    model_filename = f"model_epoch{epoch+1}_trainLoss{train_loss:.4f}_trainAcc{train_acc:.4f}_valLoss{val_loss:.4f}.pth"
+    model_filename = f"model_epoch{epoch+1}_trainLoss{train_loss:.4f}_trainAcc{train_acc:.4f}_valLoss{val_loss:.4f}_valAcc{val_acc:.4f}.pth"
     
     # 가장 좋은 모델 저장
-    # 예시에서는 val_acc 기준으로 최고 모델을 저장합니다. 필요에 따라 다른 기준으로 변경 가능합니다.
     if val_acc > best_accuracy:
         best_accuracy = val_acc
         torch.save(model.state_dict(), model_filename)
