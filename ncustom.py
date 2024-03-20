@@ -51,13 +51,10 @@ class CustomDataset(Dataset):
         adj_matrix = self.adj_matrices[idx]
         labels = self.item_labels[idx]
 
-        # 네트워크X 그래프를 PyTorch Geometric 데이터로 변환
-        pyg_data = self.graph_data(graph)
-
         return {
             'user_indices': self.user_indices,
             'item_indices': self.item_indices,
-            'graph': pyg_data,
+            'graph': graph,
             'adj_matrix': adj_matrix,
             'labels': labels
         }
