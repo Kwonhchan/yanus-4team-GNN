@@ -60,7 +60,7 @@ class CustomDataset(Dataset):
         }
 
 class NDataSplitter:
-    def __init__(self, dataset_path="Dataset/최종합데이터.csv", batchsize=32, test_size=0.1, val_size=0.2):
+    def __init__(self, dataset_path="Dataset/최종합데이터.csv", batchsize=1, test_size=0.1, val_size=0.2):
         self.batch_size = batchsize
         self.test_size = test_size
         self.val_size = val_size
