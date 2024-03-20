@@ -1,3 +1,7 @@
 Dataset/
 __pycache__/
 model/
+newdatamodel/
+runs/
+nmodel/
+model_checkpoint.pth
