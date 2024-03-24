@@ -34,20 +34,16 @@ class GraphData:
         
         
     def get_user_item_indices(self):
-        """
-        self.df 데이터프레임에서 'user_index'와 'item_index'의 유일한 값들을 각각 추출하여 반환합니다.
-        
-        Returns:
-            tuple: (user_indices, item_indices) 형태로, 각각 사용자 인덱스와 아이템 인덱스의 유일한 값들을 리스트로 포함합니다.
-        """
-        user_indices = self.df['user_index'].unique().tolist()
-        item_indices = self.df['item_index'].unique().tolist()
-        
-        # 유일한 인덱스 값들을 정렬합니다. (선택적)
-        user_indices.sort()
-        item_indices.sort()
-        
-        return user_indices, item_indices
+        graph_user_item_indices = []
+
+        for G in self.graphs:
+            # 각 그래프에서 사용자 노드와 아이템 노드의 인덱스를 추출합니다.
+            user_indices = [node for node, attr in G.nodes(data=True) if attr['type'] == 'user']
+            item_indices = [node for node, attr in G.nodes(data=True) if attr['type'] == 'item']
+
+            graph_user_item_indices.append((user_indices, item_indices))
+
+        return graph_user_item_indices
 
     def create_individual_graphs(self):
         # 'TRAVEL_ID' 별로 그룹화하여 각 그래프 생성

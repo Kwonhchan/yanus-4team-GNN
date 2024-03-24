@@ -49,14 +49,21 @@ class CustomDataset(Dataset):
         """
         graph = self.graph_data[idx]
         adj_matrix = self.adj_matrices[idx]
-        labels = self.item_labels[idx]
+        labels_list = self.item_labels[idx]
+        
+        # 여기서 user_indices, item_indices를 텐서로 변환합니다.
+        user_indices_tensor = torch.tensor(graph.x[:, 0].long())
+        item_indices_tensor = torch.tensor(graph.x[:, 1].long())
+        
+        # item_encoder를 사용하여 labels_list 내의 아이템 이름을 숫자로 변환합니다.
+        labels_indices = [self.GraphData.item_encoder.transform([label])[0] for label in labels_list]
+        labels_tensor = torch.tensor(labels_indices, dtype=torch.long)
 
         return {
-            'user_indices': self.user_indices,
-            'item_indices': self.item_indices,
-            'graph': graph,
+            'user_indices': user_indices_tensor,
+            'item_indices': item_indices_tensor,
             'adj_matrix': adj_matrix,
-            'labels': labels
+            'labels': labels_tensor
         }
 
 class NDataSplitter:
@@ -67,7 +74,7 @@ class NDataSplitter:
 
         # GraphData 인스턴스 생성
         graph_data = GraphData(dataset_path)
-        self.dataset = CustomDataset(graph_data)
+        self.dataset = CustomDataset(dataset_path)
         
     def split_data(self):
         dataset_size = len(self.dataset)
