@@ -7,29 +7,51 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import pandas as pd
 import os
-
+import pickle
 from nmodel import NGCF  # NGCF 모델 클래스
 from ncsv2graph import GraphData  # GraphData 클래스
 from ncustom import CustomDataset, NDataSplitter  # CustomDataset 및 NDataSplitter 클래스
 
-# 데이터셋 경로 설정
-data_path = 'Dataset/최종합데이터.csv'
 
-# GraphData 및 CustomDataset 인스턴스 생성
-graph_data = GraphData(data_path)
-print('그래프데이터 불러옴')
-custom_dataset = CustomDataset(graph_data)
-print("커스텀데이터 불러옴")
+def save_dataset_and_splitter(custom_dataset, data_splitter):
+    with open('custom_dataset.pkl', 'wb') as f:
+        pickle.dump(custom_dataset, f)
+    with open('data_splitter.pkl', 'wb') as f:
+        pickle.dump(data_splitter, f)
+        
+def load_dataset_and_splitter():
+    with open('custom_dataset.pkl', 'rb') as f:
+        custom_dataset = pickle.load(f)
+    with open('data_splitter.pkl', 'rb') as f:
+        data_splitter = pickle.load(f)
+    return custom_dataset, data_splitter
 
-# DataLoader 생성 및 데이터 분할
-data_splitter = NDataSplitter(data_path)  # NDataSplitter 인스턴스 생성
-print("데이터 분할 완료")
+try:
+    # 저장된 객체를 불러옵니다.
+    custom_dataset, data_splitter = load_dataset_and_splitter()
+    print("Loaded dataset and splitter from saved files.")
+except (FileNotFoundError, IOError):
+    print("Saved files not found. Creating new instances.")
+    # 데이터셋과 데이터 스플리터 인스턴스를 새로 생성합니다.
+    dataset_path = 'Dataset/최종합데이터.csv'
+    custom_dataset = CustomDataset(dataset_path)
+    data_splitter = NDataSplitter(dataset_path)
+
+    # 객체를 저장합니다.
+    save_dataset_and_splitter(custom_dataset, data_splitter)
+
+    # 데이터 로더 생성 및 데이터 분할
 train_loader, val_loader, test_loader = data_splitter.split_data()
 
+
+df = pd.read_csv('Dataset/최종합데이터.csv')
 # 모델 초기화 및 device 설정
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-num_users, num_items = len(custom_dataset.user_indices), len(custom_dataset.item_indices)
-model = NGCF(num_users=num_users, num_items=num_items, emb_size=64, layers=[64, 64, 64]).to(device)
+unique_travel_ids_count = df['TRAVEL_ID'].nunique()
+unique_VISIT_AREA_NM_ids_count = df['VISIT_AREA_NM'].nunique()
+
+num_users, num_items = unique_travel_ids_count, unique_VISIT_AREA_NM_ids_count
+model = NGCF(num_users=num_users, num_items=num_items, emb_size=64, layers=[128, 64, 64]).to(device)
 optimizer = Adam(model.parameters(), lr=0.001)
 criterion = nn.CrossEntropyLoss()
 print("모델 설정완료")
