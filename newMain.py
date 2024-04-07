@@ -26,6 +26,20 @@ def load_dataset_and_splitter():
         data_splitter = pickle.load(f)
     return custom_dataset, data_splitter
 
+class CustomLoss(nn.Module):
+    def __init__(self, base_loss_function=nn.MSELoss()):
+        super().__init__()
+        self.base_loss_function = base_loss_function
+
+    def forward(self, predictions, targets):
+        # -1 레이블을 가진 타겟은 손실 계산에서 제외
+        valid_indices = targets != -1
+        if valid_indices.any():
+            return self.base_loss_function(predictions[valid_indices], targets[valid_indices])
+        else:
+            return torch.tensor(0.0).to(predictions.device)  # 모든 타겟이 -1인 경우 0 반환
+
+
 try:
     # 저장된 객체를 불러옵니다.
     custom_dataset, data_splitter = load_dataset_and_splitter()
@@ -40,102 +54,78 @@ except (FileNotFoundError, IOError):
     # 객체를 저장합니다.
     save_dataset_and_splitter(custom_dataset, data_splitter)
 
-    # 데이터 로더 생성 및 데이터 분할
-train_loader, val_loader, test_loader = data_splitter.split_data()
 
 
-df = pd.read_csv('Dataset/최종합데이터.csv')
-# 모델 초기화 및 device 설정
+
+# 모델 설정
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+df = pd.read_csv('Dataset/최종합데이터.csv')
 unique_travel_ids_count = df['TRAVEL_ID'].nunique()
 unique_VISIT_AREA_NM_ids_count = df['VISIT_AREA_NM'].nunique()
 
 num_users, num_items = unique_travel_ids_count, unique_VISIT_AREA_NM_ids_count
-model = NGCF(num_users=num_users, num_items=num_items, emb_size=64, layers=[128, 64, 64]).to(device)
-optimizer = Adam(model.parameters(), lr=0.001)
-criterion = nn.CrossEntropyLoss()
-print("모델 설정완료")
+model = NGCF(num_users=num_users, num_items=num_items, emb_size=64, layers=[128, 64, 32], heads=2).to(device)
+# model = NGCF(num_users=num_users, num_items=num_items, emb_size=64, layers=[128, 64, 32]).to(device)
+optimizer = Adam(model.parameters(), lr=0.01)
 
-# 학습 에포크 수
-num_epochs = 100 
+criterion = CustomLoss()
+# criterion = nn.MSELoss()  # 상호작용 예측을 위해 MSE Loss 사용
+
+# 데이터 로더 생성 및 데이터 분할
+train_loader, val_loader, test_loader = data_splitter.split_data()
+
+# 학습 및 검증 루프
+num_epochs = 2000
+
 
 # TensorBoard 설정
 writer = SummaryWriter()
 
-# 학습 루프
-best_accuracy = 0.0
-for epoch in range(100):
-    model.train()
-    total_loss, total_correct, total = 0, 0, 0
-    for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/100 Training"):
-        user_indices = batch['user_indices'].to(device)
-        item_indices = batch['item_indices'].to(device)
-        adj_matrix = batch['adj_matrix'].to(device)
-        labels = batch['labels'].to(device)  # 정수 인코딩된 지역 레이블
-
+#회귀 Loss 초기화
+best_loss = float('inf')
+for epoch in range(num_epochs):
+    model.train()  # 모델을 학습 모드로 설정
+    total_loss = 0
+    for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs} Training"):
+        batch = batch.to(device)
         optimizer.zero_grad()
-        predictions = model(user_indices, item_indices, adj_matrix)
-        loss = criterion(predictions, labels)
+        predictions = model(batch)
+        loss = criterion(predictions, batch.y.float())  # 여기서 batch.y.float()으로 변경
         loss.backward()
         optimizer.step()
-
         total_loss += loss.item()
-        _, predicted = torch.max(predictions, 1)
-        total_correct += (predicted == labels).sum().item()
-        total += labels.size(0)
+    
+    train_loss = total_loss / len(train_loader)
+    print(f"Epoch {epoch+1}/{num_epochs}, Training Loss: {train_loss:.4f}")
 
-    # 학습 상태 로깅
-    avg_loss = total_loss / len(train_loader)
-    train_acc = total_correct / total
-    print(f"Epoch {epoch+1}/100 Training Loss: {avg_loss:.4f}, Training Accuracy: {train_acc:.4f}")
-
-    # 검증 로직
-    model.eval()
-    val_loss, val_correct, val_total = 0, 0, 0
+    # 검증 단계
+    model.eval()  # 모델을 평가 모드로 설정
+    val_loss = 0
     with torch.no_grad():
-        for batch in tqdm(val_loader, desc=f"Epoch {epoch+1}/100 Validation"):
-            user_indices = batch['user_indices'].to(device)
-            item_indices = batch['item_indices'].to(device)
-            adj_matrix = batch['adj_matrix'].to(device)
-            labels = batch['labels'].to(device)
-
-            predictions = model(user_indices, item_indices, adj_matrix)
-            loss = criterion(predictions, labels)
+        for batch in tqdm(val_loader, desc=f"Epoch {epoch+1}/{num_epochs} Validation"):
+            batch = batch.to(device)
+            predictions = model(batch)
+            loss = criterion(predictions, batch.y.float())
             val_loss += loss.item()
 
-            _, predicted = torch.max(predictions, 1)
-            val_correct += (predicted == labels).sum().item()
-            val_total += labels.size(0)
+    val_loss = val_loss / len(val_loader)
+    print(f"Epoch {epoch+1}/{num_epochs}, Validation Loss: {val_loss:.4f}")
 
-    avg_val_loss = val_loss / len(val_loader)
-    val_acc = val_correct / val_total
-    print(f"Epoch {epoch+1}/100 Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {val_acc:.4f}")
-
-    # TensorBoard에 로깅
-    writer.add_scalar('Loss/Train', avg_loss, epoch)
-    writer.add_scalar('Accuracy/Train', train_acc, epoch)
-    writer.add_scalar('Loss/Validation', avg_val_loss, epoch)
-    writer.add_scalar('Accuracy/Validation', val_acc, epoch)
+    # TensorBoard에 학습 및 검증 손실 로깅
+    writer.add_scalar('Loss/Train', train_loss, epoch)
+    writer.add_scalar('Loss/Validation', val_loss, epoch)
 
     # 체크포인트 저장
-    if val_acc > best_accuracy:
-        best_accuracy = val_acc
-        best_model_path = f"best_model_epoch_{epoch+1}_val_acc_{val_acc:.4f}.pt"
+    if val_loss < best_loss:
+        best_loss = val_loss
+        best_model_path = f"bm_regression/best_model_epoch_{epoch+1}_val_loss_{val_loss:.4f}.pt"
         torch.save(model.state_dict(), best_model_path)
-        print(f"New best model saved: {best_model_path} with Validation Accuracy: {val_acc:.4f}")
-
-    # 에포크별 모델 저장 (선택적)
-    epoch_model_path = os.path.join("models", f"model_epoch_{epoch+1}.pt")
-    torch.save(model.state_dict(), epoch_model_path)
-    print(f"Model saved at {epoch_model_path}")
+        print(f"New best model saved: {best_model_path} with Validation Loss: {val_loss:.4f}")
 
 # TensorBoard 로거 종료
 writer.close()
 
 print("Training completed.")
-
-
-
 
 
 # import torch

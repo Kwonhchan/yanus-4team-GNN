@@ -13,75 +13,231 @@ from tqdm import tqdm
 
 
 
-# 아이템 추천 NGCF 모델 정의
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import GCNConv, GATConv
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import GCNConv, GATConv, SAGEConv, ChebConv
+
 class NGCF(nn.Module):
-    def __init__(self, num_users, num_items, emb_size, layers):
+    def __init__(self, num_users, num_items, emb_size, layers, heads):
         super(NGCF, self).__init__()
         self.user_embedding = nn.Embedding(num_users, emb_size)
         self.item_embedding = nn.Embedding(num_items, emb_size)
         self.emb_size = emb_size
         self.GC_layers = nn.ModuleList()
-        self.Bi_layers = nn.ModuleList()
-        for From, To in zip(layers[:-1], layers[1:]):
-            self.GC_layers.append(nn.Linear(From, To))
-            self.Bi_layers.append(nn.Linear(From, To))
+        self.GAT_layers = nn.ModuleList()
+        self.GraphSAGE_layers = nn.ModuleList()
+        self.Cheb_layers = nn.ModuleList()
+        self.MLP_layers = nn.Sequential(
+            nn.Linear(emb_size * 2, 1024),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(1024, 512),  # 여기서 최종 출력 차원은 512입니다.
+            nn.ReLU(),
+            nn.Dropout(0.5)
+        )
+        self.batch_norm_layers = nn.ModuleList()
 
-    def forward(self, user_indices, item_indices, adj_matrices):
-        predictions = []
-        for b in range(len(adj_matrices)):
-            adj_matrix = adj_matrices[b].to_dense()
-            
-            u_emb = self.user_embedding(user_indices[b])  # [num_users_in_batch, emb_size]
-            i_emb = self.item_embedding(item_indices[b])  # [num_items_in_batch, emb_size]
+        # MLP_layers를 통과한 후의 차원이 512임을 반영
+        input_dim = 512  # MLP 후 출력 차원으로 시작
+        
+        # GCN 층 추가
+        for output_dim in layers:
+            self.GC_layers.append(GCNConv(input_dim, output_dim))
+            self.batch_norm_layers.append(nn.BatchNorm1d(output_dim))
+            input_dim = output_dim  # 다음 레이어를 위해 입력 차원 업데이트
 
-            # 여기서 dim=0으로 사용자와 아이템 임베딩을 올바르게 결합합니다.
-            ego_embeddings = torch.cat([u_emb, i_emb], dim=0)  # 수정됨: dim=1 -> dim=0
+        # GraphSAGE 층 추가
+        self.GraphSAGE_layers.append(SAGEConv(input_dim, input_dim))
+        self.Cheb_layers.append(ChebConv(input_dim, input_dim, K=2))
 
-            all_embeddings = [ego_embeddings]
+        # GAT 층 추가
+        for _ in range(heads):
+            # GAT의 concat=False 설정에 따라 출력 차원은 input_dim과 동일합니다.
+            self.GAT_layers.append(GATConv(input_dim, input_dim, heads, concat=False))
 
-            for gc_layer, bi_layer in zip(self.GC_layers, self.Bi_layers):
-                side_embeddings = torch.matmul(adj_matrix, ego_embeddings)
-                sum_embeddings = F.leaky_relu(gc_layer(side_embeddings))
-                bi_embeddings = F.leaky_relu(bi_layer(ego_embeddings * side_embeddings))
-                ego_embeddings = sum_embeddings + bi_embeddings
-                all_embeddings.append(ego_embeddings)
+        self.prediction_layer = nn.Linear(input_dim, 1)
 
-            all_embeddings = torch.cat(all_embeddings, dim=1)
-            # 올바른 차원으로 분할하기 위해 dim=0을 사용
-            u_g_embeddings, i_g_embeddings = torch.split(ego_embeddings, [u_emb.size(0), i_emb.size(0)], dim=0)
+    def forward(self, data):
+        edge_index, batch = data.edge_index, data.batch
+        
+        user_indices = data.x[:, 0].long()
+        item_indices = data.x[:, 1].long()
 
-            scores = torch.sum(u_g_embeddings * i_g_embeddings, dim=1)
-            prediction = F.log_softmax(scores.unsqueeze(1), dim=1)
-            predictions.append(prediction)
+        u_emb = self.user_embedding(user_indices)
+        i_emb = self.item_embedding(item_indices)
 
-        return torch.cat(predictions, dim=0)
+        # 임베딩 병합
+        x = torch.cat([u_emb, i_emb], dim=1)
+        x = self.MLP_layers(x)
+        
+        # GCN & GraphSAGE 층을 통과
+        for gc_layer, bn_layer in zip(self.GC_layers, self.batch_norm_layers):
+            x = F.relu(bn_layer(gc_layer(x, edge_index)))
+        x = F.relu(self.GraphSAGE_layers[0](x, edge_index))
+        x = F.relu(self.Cheb_layers[0](x, edge_index))
+
+        # GAT 층을 통과
+        for gat_layer in self.GAT_layers:
+            x = F.elu(gat_layer(x, edge_index))
+
+        # 최종 예측 점수 계산
+        scores = self.prediction_layer(x).squeeze()
+
+        return scores
 
 
-# NGCF 모델 정의
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# #NGCF 발전 버전1
 # class NGCF(nn.Module):
-#     def __init__(self, num_users, num_items, emb_size, layers):
+#     def __init__(self, num_users, num_items, emb_size, layers, heads):
 #         super(NGCF, self).__init__()
 #         self.user_embedding = nn.Embedding(num_users, emb_size)
 #         self.item_embedding = nn.Embedding(num_items, emb_size)
-#         self.num_users = num_users  # num_users를 클래스의 속성으로 정의
-#         self.num_items = num_items  # num_items를 클래스의 속성으로 정의
+#         self.emb_size = emb_size
 #         self.GC_layers = nn.ModuleList()
-#         self.Bi_layers = nn.ModuleList()
-#         for From, To in zip(layers[:-1], layers[1:]):
-#             self.GC_layers.append(nn.Linear(From, To))
-#             self.Bi_layers.append(nn.Linear(From, To))
+#         self.GAT_layers = nn.ModuleList()
 
-#     def forward(self, user_indices, item_indices, adj_matrix):
+#         input_dim = emb_size * 2  # 사용자와 아이템 임베딩을 연결(concatenate)
+        
+#         # GCN 층 추가
+#         for output_dim in layers:
+#             self.GC_layers.append(GCNConv(input_dim, output_dim))
+#             input_dim = output_dim  # 다음 레이어를 위해 입력 차원 업데이트
+
+#         # GAT 층 추가
+#         for _ in range(heads):
+#             self.GAT_layers.append(GATConv(input_dim, input_dim, heads=1, concat=True))
+#             # GAT 출력은 헤드 수에 따라 차원이 증가하지만 여기서는 concat을 False로 하여 차원 유지
+
+#         self.prediction_layer = nn.Linear(input_dim, 1)
+
+#     def forward(self, data):
+#         edge_index, batch = data.edge_index, data.batch
+        
+#         user_indices = data.x[:, 0].long()
+#         item_indices = data.x[:, 1].long()
+
 #         u_emb = self.user_embedding(user_indices)
 #         i_emb = self.item_embedding(item_indices)
-#         ego_embeddings = torch.cat([u_emb, i_emb], 0)
-#         all_embeddings = [ego_embeddings]
-#         for k in range(len(self.GC_layers)):
-#             side_embeddings = torch.sparse.mm(adj_matrix, ego_embeddings)
-#             sum_embeddings = F.leaky_relu(self.GC_layers[k](side_embeddings))
-#             bi_embeddings = F.leaky_relu(self.Bi_layers[k](ego_embeddings * side_embeddings))
-#             ego_embeddings = sum_embeddings + bi_embeddings
-#             all_embeddings += [ego_embeddings]
-#         all_embeddings = torch.cat(all_embeddings, 1)
-#         u_g_embeddings, i_g_embeddings = torch.split(all_embeddings, [self.num_users, self.num_items], 0)
-#         return u_g_embeddings, i_g_embeddings
+
+#         # 임베딩 병합
+#         x = torch.cat([u_emb, i_emb], dim=1)
+        
+#         # GCN 층을 통과
+#         for gc_layer in self.GC_layers:
+#             x = F.relu(gc_layer(x, edge_index))
+        
+#         # GAT 층을 통과
+#         for gat_layer in self.GAT_layers:
+#             x = F.elu(gat_layer(x, edge_index))
+
+#         # 최종 예측 점수 계산
+#         scores = self.prediction_layer(x).squeeze()
+
+#         return scores
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# # 아이템 추천 NGCF 모델 정의
+# import torch
+# import torch.nn.functional as F
+# from torch.nn import Linear
+# from torch_geometric.nn import GCNConv
+
+# class NGCF(nn.Module):
+#     def __init__(self, num_users, num_items, emb_size, layers):
+#         super(NGCF, self).__init__()
+#         self.user_embedding = torch.nn.Embedding(num_users, emb_size)
+#         self.item_embedding = torch.nn.Embedding(num_items, emb_size)
+#         self.emb_size = emb_size
+#         self.GC_layers = torch.nn.ModuleList()
+        
+#         input_dim = emb_size * 2  # 사용자와 아이템 임베딩을 연결(concatenate)
+#         for output_dim in layers:
+#             self.GC_layers.append(GCNConv(input_dim, output_dim))
+#             input_dim = output_dim  # 다음 레이어를 위해 입력 차원 업데이트
+
+#         # 마지막 GCNConv 레이어의 출력을 사용하여 예측을 수행하는 선형 레이어
+#         self.prediction_layer = Linear(input_dim, 1)  
+
+#     def forward(self, data):
+#         # data는 PyTorch Geometric의 Batch 객체
+#         edge_index, batch = data.edge_index, data.batch
+        
+#         # 사용자와 아이템 인덱스 추출
+#         user_indices = data.x[:, 0].long()
+#         item_indices = data.x[:, 1].long()
+
+#         # 사용자와 아이템 임베딩 계산
+#         u_emb = self.user_embedding(user_indices)
+#         i_emb = self.item_embedding(item_indices)
+
+#         # 임베딩 병합
+#         x = torch.cat([u_emb, i_emb], dim=1)
+        
+#         # GCN 레이어를 통과시키며 임베딩 업데이트
+#         for gc_layer in self.GC_layers:
+#             x = F.relu(gc_layer(x, edge_index))
+
+#         # 각 사용자-아이템 쌍에 대한 예측 점수 계산
+#         scores = self.prediction_layer(x).squeeze()
+
+#         return scores

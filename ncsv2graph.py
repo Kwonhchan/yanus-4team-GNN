@@ -147,3 +147,14 @@ class WeightedAdjacencyMatrixCreator:
             adj_matrix = self.create_adjacency_matrix(data)
             adjacency_matrices.append(adj_matrix)
         return adjacency_matrices
+    
+# #num_classes 구하는 코드
+# graphData = GraphData('Dataset\최종합데이터.csv')
+
+# # PyTorch Geometric 데이터 리스트 생성
+# graphData.create_pyg_list()
+
+# # 분류 클래스의 총 수 구하기
+# num_classes = len(graphData.item_encoder.classes_)
+
+# print(f"분류 클래스의 총 수: {num_classes}")

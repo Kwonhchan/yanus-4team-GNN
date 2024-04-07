@@ -13,61 +13,23 @@ from torch.utils.data import Dataset
 from torch_geometric.data import DataLoader as GeoDataLoader
 import pickle
 
-class CustomDataset(Dataset):
+class CustomDataset(torch.utils.data.Dataset):
     def __init__(self, dataset_path):
-        self.path = dataset_path
         self.GraphData = GraphData(dataset_path)
         self.GraphData.prepare_data()
         self.GraphData.create_individual_graphs()
-        # 사용자 및 아이템 인덱스 가져오기 추가
-        self.user_item_indices = self.GraphData.get_user_item_indices()
-        self.formakelabel = self.GraphData.graphs  # 네트워크 X 그래프
         self.GraphData.create_pyg_list()
-        self.graph_data = self.GraphData.get_pyg_graphs()  # pyg그래프
-        self.adj_matrices_creator = WeightedAdjacencyMatrixCreator(self.GraphData)  # 인스턴스 생성
-        self.adj_matrices = self.adj_matrices_creator.process_all_graphs()  # 인접 행렬 생성
-        self.item_labels = self.get_item_labels()
-
+        self.graph_data = self.GraphData.get_pyg_graphs()
 
     def __len__(self):
-        """
-        데이터셋의 총 그래프 수를 반환합니다.
-        """
         return len(self.graph_data)
     
-    def get_item_labels(self):
-        item_labels = []
-        for graph in self.formakelabel:
-            labels = []
-            for node, attr in graph.nodes(data=True):
-                if attr['type'] == 'item':
-                    labels.append(attr['name'])
-            item_labels.append(labels)
-        return item_labels
-
     def __getitem__(self, idx):
-        """
-        주어진 인덱스에 해당하는 그래프 데이터와 인접 행렬을 반환합니다.
-        """
-        graph = self.graph_data[idx]
-        adj_matrix = self.adj_matrices[idx]
-        # 여기서 user_indices, item_indices를 올바르게 가져옵니다.
-        user_indices, item_indices = self.user_item_indices[idx] 
-        
-        # item_labels를 가져와서 숫자 인덱스로 변환합니다.
-        labels_list = self.item_labels[idx]
-        labels_indices = [self.GraphData.item_encoder.transform([label])[0] for label in labels_list]
-        labels_tensor = torch.tensor(labels_indices, dtype=torch.long)
-
-        return {
-            'user_indices': torch.tensor(user_indices, dtype=torch.long),
-            'item_indices': torch.tensor(item_indices, dtype=torch.long),
-            'adj_matrix': adj_matrix,
-            'labels': labels_tensor
-        }
+        # PyG Data 객체 직접 반환
+        return self.graph_data[idx]
 
 class NDataSplitter:
-    def __init__(self, dataset_path="Dataset/최종합데이터.csv", batchsize=1, test_size=0.1, val_size=0.2):
+    def __init__(self, dataset_path="Dataset/최종합데이터.csv", batchsize=8, test_size=0.1, val_size=0.2):
         self.batch_size = batchsize
         self.test_size = test_size
         self.val_size = val_size
