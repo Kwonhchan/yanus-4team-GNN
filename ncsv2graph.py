@@ -12,6 +12,10 @@ from torch.utils.data import DataLoader
 import torch.utils.data
 
 class GraphData:
+    user_encoder = LabelEncoder()
+    item_encoder = LabelEncoder()
+    gender_encoder = LabelEncoder()
+    
     def __init__(self,path):
         self.path = 'Dataset\최종합데이터.csv'  # 경로를 생성자의 매개변수로 받아옵니다.
         self.df = pd.read_csv(self.path)
@@ -20,18 +24,10 @@ class GraphData:
         self.pyg_graphs = []
 
     def prepare_data(self):
-        # LabelEncoder를 사용하여 'TRAVEL_ID'와 'VISIT_AREA_NM'을 각각 인덱스로 변환
-        self.user_encoder = LabelEncoder()
-        self.item_encoder = LabelEncoder()
-
-        self.df['user_index'] = self.user_encoder.fit_transform(self.df['TRAVEL_ID'])
-        self.df['item_index'] = self.item_encoder.fit_transform(self.df['VISIT_AREA_NM'])
-        
-        # 'GENDER' 칼럼을 숫자로 변환하여 새로운 칼럼 'GENDER_index' 생성
-        self.df['GENDER_index'] = self.user_encoder.fit_transform(self.df['GENDER'])
-
+        self.df['user_index'] = self.__class__.user_encoder.fit_transform(self.df['TRAVEL_ID'])
+        self.df['item_index'] = self.__class__.item_encoder.fit_transform(self.df['VISIT_AREA_NM'])
+        self.df['GENDER_index'] = self.__class__.gender_encoder.fit_transform(self.df['GENDER'])
         self.create_individual_graphs()
-        
         
     def get_user_item_indices(self):
         graph_user_item_indices = []

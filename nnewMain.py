@@ -47,11 +47,14 @@ except (FileNotFoundError, IOError):
     save_dataset_and_splitter(custom_dataset, data_splitter)
 
 def accuracy(output, target):
-    # 최대 로그 확률에 해당하는 인덱스를 예측값으로 선택
-    preds = output.argmax(dim=1)
-    correct = (preds == target).float()  # 예측과 실제 값이 일치하는 경우
-    acc = correct.sum() / len(correct)
-    return acc
+    valid_indices = target != -1
+    if valid_indices.any():
+        preds = output[valid_indices].argmax(dim=1)
+        correct = (preds == target[valid_indices]).float()
+        acc = correct.sum() / len(correct)
+        return acc
+    else:
+        return 0.0
 
 class CustomLoss(nn.Module):
     def __init__(self, base_loss_function=nn.CrossEntropyLoss()):
@@ -76,7 +79,7 @@ unique_VISIT_AREA_NM_ids_count = df['VISIT_AREA_NM'].nunique()
 
 num_users, num_items = unique_travel_ids_count, unique_VISIT_AREA_NM_ids_count
 
-num_classes = 10844
+num_classes = 41476
 custom_loss_function = CustomLoss()
 model = NGCF(num_users=num_users, num_items=num_items, emb_size=64, layers=[128, 64, 32], heads=1, num_classes=num_classes).to(device)
 # model = NGCF(num_users=num_users, num_items=num_items, emb_size=64, layers=[128, 64, 32]).to(device)
@@ -88,7 +91,7 @@ criterion = CrossEntropyLoss()
 train_loader, val_loader, test_loader = data_splitter.split_data()
 
 # 학습 및 검증 루프
-num_epochs = 100
+num_epochs = 10
 
 # TensorBoard 설정
 writer = SummaryWriter()

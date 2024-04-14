@@ -4,4 +4,9 @@ model/
 newdatamodel/
 runs/
 nmodel/
+model_checkpoint/
 model_checkpoint.pth
+bm_regression/
+./custom_dataset.pkl
+./data_splitter.pkl
+best_check

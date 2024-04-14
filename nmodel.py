@@ -55,7 +55,7 @@ class NGCF(nn.Module):
 
         # GraphSAGE 층 추가
         self.GraphSAGE_layers.append(SAGEConv(input_dim, input_dim))
-        self.Cheb_layers.append(ChebConv(input_dim, input_dim, K=2))
+        self.Cheb_layers.append(ChebConv(input_dim, input_dim, K=5))
 
         # GAT 층 추가
         for _ in range(heads):

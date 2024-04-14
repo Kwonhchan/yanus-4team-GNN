@@ -13,13 +13,17 @@ from torch.utils.data import Dataset
 from torch_geometric.data import DataLoader as GeoDataLoader
 import pickle
 
+
+
+
 class CustomDataset(torch.utils.data.Dataset):
     def __init__(self, dataset_path):
         self.GraphData = GraphData(dataset_path)
-        self.GraphData.prepare_data()
-        self.GraphData.create_individual_graphs()
         self.GraphData.create_pyg_list()
         self.graph_data = self.GraphData.get_pyg_graphs()
+        self.user_encoder = GraphData.user_encoder
+        self.item_encoder = GraphData.item_encoder
+        self.gender_encoder = GraphData.gender_encoder
 
     def __len__(self):
         return len(self.graph_data)
@@ -29,7 +33,7 @@ class CustomDataset(torch.utils.data.Dataset):
         return self.graph_data[idx]
 
 class NDataSplitter:
-    def __init__(self, dataset_path="Dataset/최종합데이터.csv", batchsize=8, test_size=0.1, val_size=0.2):
+    def __init__(self, dataset_path="Dataset/최종합데이터.csv", batchsize=4, test_size=0.1, val_size=0.2):
         self.batch_size = batchsize
         self.test_size = test_size
         self.val_size = val_size
