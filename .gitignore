@@ -7,6 +7,5 @@ nmodel/
 model_checkpoint/
 model_checkpoint.pth
 bm_regression/
-./custom_dataset.pkl
-./data_splitter.pkl
+*.pkl
 best_check
