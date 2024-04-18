@@ -130,7 +130,7 @@ app = FastAPI()
 
 # 모델 로드
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model_path = r"model_checkpoint\best_model_epoch_1_val_loss_10.5598_val_acc_0.0018.pt" # 이전에 학습된 모델의 경로
+model_path = r"model_checkpoint\best_model_epoch_1_val_loss_10.5523_val_acc_0.0009.pt" # 이전에 학습된 모델의 경로
 
 df = pd.read_csv('Dataset/최종합데이터.csv')
 unique_travel_ids_count = df['TRAVEL_ID'].nunique()
