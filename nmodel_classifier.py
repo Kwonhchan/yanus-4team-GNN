@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, GATConv, SAGEConv, ChebConv
 
+import torch.nn.functional as F
+
 class NGCF(nn.Module):
     def __init__(self, num_users, num_items, emb_size, layers, heads, num_classes):
         super(NGCF, self).__init__()
@@ -59,4 +61,8 @@ class NGCF(nn.Module):
             x = F.elu(gat_layer(x, edge_index))
 
         scores = self.prediction_layer(x)
-        return scores
+
+        # softmax를 통해 확률 분포로 변환
+        probabilities = F.softmax(scores, dim=1)
+
+        return probabilities

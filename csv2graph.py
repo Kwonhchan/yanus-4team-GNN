@@ -37,7 +37,8 @@ class csv2graph_D:
                 feature = row[['RESIDENCE_TIME_MIN', 'REVISIT_INTENTION', 'RCMDTN_INTENTION']].tolist()
                 user_graph.add_node(node_id, feature=feature)
             for source, target in combinations(user_graph.nodes, 2):
-                weight = user_data.loc[(user_data['VISIT_AREA_NM'] == source) | (user_data['VISIT_AREA_NM'] == target), 'DGSTFN'].mean()
+                weight = user_data.loc[(user_data['VISIT_AREA_NM'] == source) | (user_data['VISIT_AREA_NM'] == target),
+                                       'DGSTFN'].mean()
                 user_graph.add_edge(source, target, weight=weight)
             self.graphs[user_id] = user_graph
 

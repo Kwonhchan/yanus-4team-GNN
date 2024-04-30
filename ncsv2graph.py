@@ -48,7 +48,8 @@ class GraphData:
             user_index = group['user_index'].iloc[0]  # 모든 row에서 user_index는 동일합니다.
             
             # 사용자 노드에 속성 추가
-            user_attributes = group.iloc[0][['GENDER_index', 'AGE_GRP', 'FAMILY_MEMB', 'TRAVEL_COMPANIONS_NUM']].to_dict()
+            user_attributes = group.iloc[0][['GENDER_index', 'AGE_GRP', 'FAMILY_MEMB',
+                                             'TRAVEL_COMPANIONS_NUM']].to_dict()
             G.add_node(user_index, **user_attributes, type='user')
 
             for _, row in group.iterrows():
@@ -57,7 +58,8 @@ class GraphData:
                 G.add_node(item_index, type='item', name=row['VISIT_AREA_NM'])
 
                 # 엣지 추가 및 엣지 속성 설정
-                edge_attributes = row[['RESIDENCE_TIME_MIN', 'DGSTFN', 'REVISIT_INTENTION', 'RCMDTN_INTENTION']].to_dict()
+                edge_attributes = row[['RESIDENCE_TIME_MIN', 'DGSTFN', 'REVISIT_INTENTION',
+                                       'RCMDTN_INTENTION']].to_dict()
                 G.add_edge(user_index, item_index, **edge_attributes)
             
             self.graphs.append(G)
